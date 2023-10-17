@@ -33,6 +33,98 @@ differenceImage = imsubtract(blurredImage, grayImage);
 % Increase contrast of blurred and subtracted image.
 differenceImage = imadjust(differenceImage);
 
+% Erode the difference image.
+erodedImage = imerode(differenceImage,[1;1;1]);
+
+% Perform morphological closing.
+closedImage = imclose(erodedImage,strel('rectangle',[30,30]));
+
+% Fill holes in the closed image.
+filledImage = imfill(closedImage, 'holes');
+
+% Binarise the filled image.
+binaryImage = imbinarize(filledImage);
+
+% Use a small structuring element to erode the image further to disconnect border components from central blobs.
+se = strel('disk', 3); 
+binaryImage = imerode(binaryImage, se);
+binaryImage = imdilate(binaryImage, se);
+
+% Clear border blobs from binary image.
+borderClearedImage = imclearborder(binaryImage);
+
+% Extract bounding boxes from the border cleared image.
+bboxStats = regionprops(borderClearedImage, "BoundingBox");
+bboxes = vertcat(bboxStats.BoundingBox);
+
+% Draw bounding boxes on the original image
+outputImageNoFilter = insertShape(RGB, "Rectangle", bboxes, "LineWidth", 2, "Color", "green");
+
+% Compute the aspect ratio for each bounding box
+widths = bboxes(:,3);
+heights = bboxes(:,4);
+aspectRatios = widths ./ heights;
+
+% Define acceptable aspect ratio range for license plates
+minAspectRatio = 2;
+maxAspectRatio = 5;
+
+% Set size limits (area of bounding box)
+minArea = 1000; % minimum area
+maxArea = 30000; % maximum area
+
+% Filter bounding boxes based on aspect ratio and size
+filterIdx = (aspectRatios < minAspectRatio) | ...
+    (aspectRatios > maxAspectRatio) | ...
+    (bboxes(:,3) .* bboxes(:,4) < minArea) | ...
+    (bboxes(:,3) .* bboxes(:,4) > maxArea);
+
+% Filter out very thin bounding boxes (long and thin)
+heightToWidthRatioThreshold = 0.3;
+thinBoxesIdx = (bboxes(:,4) ./ bboxes(:,3)) < heightToWidthRatioThreshold;
+
+% Combine filters
+filterIdx = filterIdx | thinBoxesIdx;
+
+% Remove undesired bounding boxes
+bboxes(filterIdx, :) = [];
+
+% Draw bounding boxes on the original image
+outputImageWithFilter = insertShape(RGB, "Rectangle", bboxes, "LineWidth", 2, "Color", "green");
+
+%% ========================================================================
+
+figure;
+set(gcf, 'WindowState', 'maximized');
+
+subplot(2,4,1);
+imshow(erodedImage);
+title('Eroded Image');
+
+subplot(2,4,2);
+imshow(closedImage);
+title('Morphologically Closed Image');
+
+subplot(2,4,3);
+imshow(filledImage);
+title('Closed Image with Holes Filled In');
+
+subplot(2,4,4);
+imshow(binaryImage);
+title('Binarised Filled Image');
+
+subplot(2,4,5);
+imshow(borderClearedImage);
+title('Binary Image Cleared of Border Blobs');
+
+subplot(2,4,6);
+imshow(outputImageNoFilter);
+title('Possible Plate Regions');
+
+subplot(2,4,7);
+imshow(outputImageWithFilter);
+title('Possible Plate Regions based on Aspect Ratio');
+
 %% ========================================================================
 
 % Detect MSER regions.
