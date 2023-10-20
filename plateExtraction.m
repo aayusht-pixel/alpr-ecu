@@ -21,11 +21,15 @@ RGB = imread(fullfile(filepath, filename));
 [~, target, ~] = fileparts(filename);
 
 %% ========================================================================
+
 RGB = imresize(RGB,[650 nan]);
 
 %% ========================================================================
+
+% Convert image to gray scale.
 grayImage = rgb2gray(RGB);
 
+% Using median filtering on grayscale image.
 grayImage = medfilt2(grayImage);                                                                            
 
 % Blurred Image Subtraction
@@ -65,6 +69,8 @@ cc = bwconncomp(clearBlobs);
 
 % Extract regions from the RGB image
 blobs = cell(1, cc.NumObjects);
+mserRegions = cell(1, cc.NumObjects);
+likelyLicensePlateRegions = cell(1, cc.NumObjects);
 for i = 1:cc.NumObjects
     % Create a binary mask for each blob
     mask = false(size(clearBlobs));
@@ -79,18 +85,52 @@ for i = 1:cc.NumObjects
     end
     
     blobs{i} = blobRGB;
+    
+    % Convert the blob to grayscale
+    blobGray = rgb2gray(blobRGB);
+    
+    % Detect MSER regions in the blob
+    regions = detectMSERFeatures(blobGray);
+    
+    % Store the MSER regions
+    mserRegions{i} = regions;
+    
+    % Create a binary image for each MSER region and calculate properties
+    likelyRegions = [];
+    for j = 1:regions.Count
+        % Get the pixel list of the j-th MSER region
+        pixelList = regions.PixelList{j};
+        
+        % Create a binary image for the MSER region
+        regionImage = false(size(blobGray));
+        idx = sub2ind(size(regionImage), pixelList(:,2), pixelList(:,1));
+        regionImage(idx) = true;
+        
+        % Extract properties of the region
+        stats = regionprops(regionImage, 'Solidity', 'Extent', 'BoundingBox');
+        
+        % Filter region based on properties
+        aspectRatio = stats.BoundingBox(3) / stats.BoundingBox(4);
+        if aspectRatio > 0.2 && aspectRatio < 1 && stats.Solidity > 0.2 && stats.Extent > 0.2
+            likelyRegions = [likelyRegions, j];
+        end
+    end
+    
+    % Store the likely license plate regions
+    likelyLicensePlateRegions{i} = regions(likelyRegions);
 end
 
-% Display the extracted regions
+% Display the extracted regions with likely license plate regions overlaid
 figure;
 set(gcf, 'WindowState', 'maximized');
 for i = 1:length(blobs)
     subplot(ceil(sqrt(length(blobs))), ceil(sqrt(length(blobs))), i);
     imshow(blobs{i});
+    hold on;
+    plot(likelyLicensePlateRegions{i}, 'showPixelList', true, 'showEllipses', false);
     title(['Blob ' num2str(i)]);
+    hold off;
 end
-title ('Probable Plate Areas in the RGB Image')
-
 
 %% ========================================================================
 
