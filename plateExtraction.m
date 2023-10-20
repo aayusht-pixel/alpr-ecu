@@ -1,5 +1,7 @@
 %% ========================================================================
+% -------------------------------------------------------------------------
 % START UP
+% -------------------------------------------------------------------------
 
 % General clear and close
 clear; close all; clc;
@@ -15,11 +17,11 @@ extensions = {...
 if filename == 0
     return;  % Exit if no file is selected
 end
+
 RGB = imread(fullfile(filepath, filename));
 
 % Identify target answer from file name
 [~, target, ~] = fileparts(filename);
-
 %% ========================================================================
 
 RGB = imresize(RGB,[650 nan]);
@@ -61,8 +63,9 @@ clearedImage = imclearborder(filledImage);
 clearBlobs = bwareaopen(clearedImage, 500);
 
 %% ========================================================================
-
+% -------------------------------------------------------------------------
 % Extract regions from grayscale image corresponding to clearBlobs locations.
+% -------------------------------------------------------------------------
 
 % Find connected components in the binary image
 cc = bwconncomp(clearBlobs);
@@ -120,7 +123,9 @@ for i = 1:cc.NumObjects
     likelyLicensePlateRegions{i} = regions(likelyRegions);
 end
 
+% -------------------------------------------------------------------------
 % Display the extracted regions with likely license plate regions overlaid
+% -------------------------------------------------------------------------
 figure;
 set(gcf, 'WindowState', 'maximized');
 for i = 1:length(blobs)
@@ -132,8 +137,8 @@ for i = 1:length(blobs)
     hold off;
 end
 
+% -------------------------------------------------------------------------
 %% ========================================================================
-
 figure;
 set(gcf, 'WindowState', 'maximized');
 
