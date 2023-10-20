@@ -58,6 +58,42 @@ clearBlobs = bwareaopen(clearedImage, 500);
 
 %% ========================================================================
 
+% Extract regions from grayscale image corresponding to clearBlobs locations.
+
+% Find connected components in the binary image
+cc = bwconncomp(clearBlobs);
+
+% Extract regions from the RGB image
+blobs = cell(1, cc.NumObjects);
+for i = 1:cc.NumObjects
+    % Create a binary mask for each blob
+    mask = false(size(clearBlobs));
+    mask(cc.PixelIdxList{i}) = true;
+    
+    % Extract the corresponding region from the RGB image
+    blobRGB = RGB;
+    for c = 1:3
+        channel = blobRGB(:,:,c);
+        channel(~mask) = 0;
+        blobRGB(:,:,c) = channel;
+    end
+    
+    blobs{i} = blobRGB;
+end
+
+% Display the extracted regions
+figure;
+set(gcf, 'WindowState', 'maximized');
+for i = 1:length(blobs)
+    subplot(ceil(sqrt(length(blobs))), ceil(sqrt(length(blobs))), i);
+    imshow(blobs{i});
+    title(['Blob ' num2str(i)]);
+end
+title ('Probable Plate Areas in the RGB Image')
+
+
+%% ========================================================================
+
 figure;
 set(gcf, 'WindowState', 'maximized');
 
