@@ -62,62 +62,58 @@ clearBlobs = bwareaopen(clearedImage, 500);
 
 %% ========================================================================
 
-error = false;
+% Blob analysis
+cc = bwconncomp(clearBlobs);
+stats = regionprops(cc, 'Area');
+areaThreshold = 500; % Adjust this value based on the expected size of meaningful blobs
+idx = find([stats.Area] > areaThreshold);
+filteredImage = ismember(labelmatrix(cc), idx);
 
-% Find object with aspect ratio (ar) > 2, not on any 4 image boundaries,
-% and has largest area
-[height, width] = size(clearBlobs);
-p1 = regionprops(clearBlobs, 'BoundingBox', 'Area', 'Orientation', 'Eccentricity');
-number_of_objects = length(p1);
-if number_of_objects > 0
-    candidates = false(1, number_of_objects);
-    for n = 1:number_of_objects
-        ar = p1(n).BoundingBox(3) / p1(n).BoundingBox(4);
-        orientation = abs(p1(n).Orientation);  % Absolute value to consider tilted plates
-        eccentricity = p1(n).Eccentricity;
-        candidates(n) = ar > 2 && ...
-                        p1(n).BoundingBox(1) > 10 && ...
-                        p1(n).BoundingBox(2) > 10 && ...
-                        (width - p1(n).BoundingBox(1) - p1(n).BoundingBox(3)) > 10 && ...
-                        (height - p1(n).BoundingBox(2) - p1(n).BoundingBox(4)) > 10 && ...
-                        orientation < 50 && ...  
-                        eccentricity < 0.95;
-    end
-    if sum(candidates) >= 1
-        areas = candidates .* [p1.Area];
-        index = find(areas == max(areas));
-        plateRegion = imcrop(RGB, p1(index(1)).BoundingBox);
-        % Use index(1) in case there are > 1 object with largest area
-    else
-        error = true;
-        disp('No suitable candidates found.');
-    end
+% Apply edge detection on filtered image
+edges = edge(clearBlobs, 'Canny');
+
+% Use the Hough transform to detect lines
+[H, theta, rho] = hough(edges);
+peaks = houghpeaks(H, 50, 'Threshold', 0.3*max(H(:)));
+lines = houghlines(edges, theta, rho, peaks);
+
+% Analyze the orientation of lines to detect tilt
+angles = [lines.theta];
+mean_angle = mean(angles);
+
+if abs(mean_angle) < 3  % Threshold for straight image
+    disp('Image tile does not need to be corrected');
+    tilt = "straight";
+    correctedImage = RGB; % No tilt correction needed
+elseif mean_angle > 0
+    disp('Image is tilted to the right');
+    tilt = "right-tilted";
+    correctedImage = imrotate(RGB, -mean_angle, 'bicubic', 'crop'); % Rotate to correct tilt
 else
-    error = true;
-    disp('No objects detected.');
+    disp('Image is tilted to the left');
+    tilt = "left-tilted";
+    correctedImage = imrotate(RGB, -mean_angle, 'bicubic', 'crop'); % Rotate to correct tilt
 end
-
-% Display Results
-if error == true
-    disp('Vehicle number plate not found. Project terminated');
-end
-
 
 %% ========================================================================
 
 figure;
 set(gcf, 'WindowState', 'maximized');
 
-subplot(1,2,1);
-imshow(clearBlobs);
-title('Filtered Binary Image');
+% Display the original and corrected images side by side
+subplot(1, 2, 1);
+imshow(RGB), hold on;
+title('Original Image');
 
-subplot(1,2,2);
-if error==true
-    imshow(RGB)
-else 
-    imshow(plateRegion)
+% Superimpose the detected lines on the original image
+for k = 1:length(lines)
+    xy = [lines(k).point1; lines(k).point2];
+    line(xy(:,1), xy(:,2), 'LineWidth', 2, 'Color', [1 0 0]); % Red color for the lines
 end
-title('Plate Extraction');
+hold off;
+
+subplot(1, 2, 2);
+imshow(correctedImage);
+title(sprintf('Corrected Image (%s)', tilt));
 
 %% ========================================================================
