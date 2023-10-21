@@ -1,84 +1,129 @@
 %% ========================================================================
-% -------------------------------------------------------------------------
 % START UP
-% -------------------------------------------------------------------------
+
 % General clear and close
 clear; close all; clc;
-% Get user to select input image
-% List of desired extensions and their descriptions
-extensions = {...
-    '*.jpg;*.jpeg;*.JPG;*.JPEG', 'JPEG Files (*.jpg, *.jpeg)'; ...
-    '*.png;*.PNG', 'PNG Files (*.png)';
-    };
 
-[filename, filepath] = uigetfile(extensions, 'Select input image');
-if filename == 0
-    return;  % Exit if no file is selected
+% Get user to select input folder
+folderpath = uigetdir('', 'Select the folder containing images');
+
+% Specify the folder where the images are located
+imageFolder = folderpath;
+
+% Get a list of all image files in the folder with different extensions
+extensions = {'*.jpeg', '*.jpg', '*.png', '*.JPEG', '*.JPG', '*.PNG'};
+imageFiles = [];
+for i = 1:length(extensions)
+    newFiles = dir(fullfile(imageFolder, extensions{i}));
+    for j = 1:length(newFiles)
+        if isempty(imageFiles)
+            imageFiles = newFiles(j);
+        else
+            lowerCaseNames = lower({imageFiles.name});
+            if ~ismember(lower(newFiles(j).name), lowerCaseNames)
+                imageFiles = [imageFiles; newFiles(j)];
+            end
+        end
+    end
 end
 
-RGB = imread(fullfile(filepath, filename));
-
-% Identify target answer from file name
-[~, target, ~] = fileparts(filename);
-%% ========================================================================
-
-RGB = imresize(RGB,[650 nan]);
-
-%% ========================================================================
-
-bbox = detectTextCRAFT(RGB, CharacterThreshold=0.3);
-
-% Define distance threshold for merging bounding boxes
-distanceThreshold = 125;
-
-% Display the original image with original bounding boxes
-rgbOutOriginal = insertShape(RGB, "rectangle", bbox, LineWidth=4, Color="red");
-
-% Merge close bounding boxes
-mergedBbox = mergeBoundingBoxes(bbox, distanceThreshold);
-
-% Create gray and complement images
-grayImage = im2gray(RGB);
-binaryImage = imbinarize(grayImage);
-complementImage = imcomplement(binaryImage);
-
-% Perform OCR with merged bounding boxes
-output = ocr(complementImage, mergedBbox, LayoutAnalysis="Word");
-recognizedWords = cat(1, output(:).Words);
-
-% Display the original image with merged bounding boxes
-rgbOutMerged = insertShape(RGB, "rectangle", mergedBbox, LineWidth=4, Color="green");
-
-% Licence plate detection
-licencePlateBbox = detectLicencePlate(RGB, mergedBbox);
-
-% Display the original image with licence plate bounding box
-rgbOutLicencePlate = insertShape(RGB, "rectangle", licencePlateBbox, LineWidth=4, Color="blue");
-
-%% ========================================================================
-
-figure;
-set(gcf, 'WindowState', 'maximized');
-
-subplot(2,2,1);
-imshow(rgbOutOriginal);
-title('Original Image with Original Bounding Boxes');
-
-subplot(2,2,2);
-imshow(rgbOutMerged);
-title('Original Image with Merged Bounding Boxes');
-
-subplot(2,2,3);
-imshow(rgbOutLicencePlate);
-title('Original Image with Licence Plate Bounding Box');
-
-% Crop the final bounding box from the RGB image
-if ~isempty(licencePlateBbox)
-    licencePlateImage = imcrop(RGB, licencePlateBbox);
-    subplot(2,2,4);
-    imshow(licencePlateImage);
-    title('Extraced Licence Plate Region');
+totalImages = length(imageFiles);
+if totalImages == 0
+    error('No images found in the specified directory.');
 end
+
+correctGuesses = 0;
+
+for k = 1:totalImages
+    try
+        % Load image
+        filename = imageFiles(k).name;
+        RGB = imread(fullfile(folderpath, filename));
+        %% ========================================================================
+
+        RGB = imresize(RGB,[650 nan]);
+
+        %% ========================================================================
+
+        bbox = detectTextCRAFT(RGB, CharacterThreshold=0.3);
+
+        % Define distance threshold for merging bounding boxes
+        distanceThreshold = 125;
+
+        % Display the original image with original bounding boxes
+        rgbOutOriginal = insertShape(RGB, "rectangle", bbox, LineWidth=4, Color="red");
+
+        % Merge close bounding boxes
+        mergedBbox = mergeBoundingBoxes(bbox, distanceThreshold);
+
+        % Create gray and complement images
+        grayImage = im2gray(RGB);
+        binaryImage = imbinarize(grayImage);
+        complementImage = imcomplement(binaryImage);
+
+        % Perform OCR with merged bounding boxes
+        output = ocr(complementImage, mergedBbox, LayoutAnalysis="Word");
+        recognizedWords = cat(1, output(:).Words);
+
+        % Display the original image with merged bounding boxes
+        rgbOutMerged = insertShape(RGB, "rectangle", mergedBbox, LineWidth=4, Color="green");
+
+        % Licence plate detection
+        licencePlateBbox = detectLicencePlate(RGB, mergedBbox);
+
+        % Display the original image with licence plate bounding box
+        rgbOutLicencePlate = insertShape(RGB, "rectangle", licencePlateBbox, LineWidth=4, Color="blue");
+
+        %% ========================================================================
+
+        figure;
+        set(gcf, 'WindowState', 'maximized');
+
+        subplot(2,2,1);
+        imshow(rgbOutOriginal);
+        title('Original Image with Original Bounding Boxes');
+
+        subplot(2,2,2);
+        imshow(rgbOutMerged);
+        title('Original Image with Merged Bounding Boxes');
+
+        subplot(2,2,3);
+        imshow(rgbOutLicencePlate);
+        title('Original Image with Licence Plate Bounding Box');
+
+        % Crop the final bounding box from the RGB image
+        if ~isempty(licencePlateBbox)
+            licencePlateImage = imcrop(RGB, licencePlateBbox);
+            subplot(2,2,4);
+            imshow(licencePlateImage);
+            title('Extraced Licence Plate Region');
+        end
+
+        %% ========================================================================
+
+        % Prompt user for confirmation
+        button = questdlg('Was the plate area detected correctly?', ...
+            'Confirmation', ...
+            'Yes', 'No', 'Yes');
+        switch button
+            case 'Yes'
+                correctGuesses = correctGuesses + 1;
+            case 'No'
+                % Do nothing, just move to the next image
+        end
+
+    catch ME
+        % Error handling: display error message and move to next image
+        warning(['Error processing image: ' filename '. Message: ' ME.message]);
+        continue;
+    end
+
+close all; % Close all open figures
+end
+
+% Display accuracy
+accuracy = (correctGuesses / totalImages) * 100;
+disp(['Accuracy: ' num2str(accuracy) '%']);
 
 %% ========================================================================
 % -------------------------------------------------------------------------
