@@ -103,7 +103,7 @@ function mergedBbox = mergeBoundingBoxes(bbox, threshold)
     end
 end
 
-% -------------------------------------------------------------------------\
+% -------------------------------------------------------------------------
 
 % Function to check if two bounding boxes are close to each other
 function isClose = isClose(bbox1, bbox2, threshold)
@@ -166,7 +166,7 @@ end
 function score = measureLicencePlateCriteria(gray, bbox)
     % Aspect Ratio
     aspectRatio = size(gray, 2) / size(gray, 1);
-    expectedAspectRatio = 2; % Adjust as needed
+    expectedAspectRatio = 2;
     aspectRatioScore = 1 / (1 + abs(aspectRatio - expectedAspectRatio));
     
     % Character Recognition
