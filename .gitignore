@@ -1,3 +1,12 @@
+.gitignore
+
 /sample_images
 /Test_dataset_2023
 /Training_dataset_2023
+
+incorrect_extractions.txt
+
+training_angled_incorrect_extractions.txt
+training_front_incorrect_extractions.txt
+testing_angled_incorrect_extractions.txt
+testing_front_incorrect_extractions.txt
