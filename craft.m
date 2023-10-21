@@ -29,7 +29,7 @@ RGB = imresize(RGB,[650 nan]);
 bbox = detectTextCRAFT(RGB, CharacterThreshold=0.3);
 
 % Define distance threshold for merging bounding boxes
-distanceThreshold = 100;
+distanceThreshold = 200;
 
 % Display the original image with original bounding boxes
 rgbOutOriginal = insertShape(RGB, "rectangle", bbox, LineWidth=4, Color="red");
